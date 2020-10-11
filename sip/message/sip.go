@@ -100,9 +100,7 @@ func Parse(v []byte) (output SipMsg) {
 	// Allow multiple vias and media Attribs
 	viaIdx := 0
 	output.Via = make([]SipVia, 0, 8)
-
 	lines := bytes.Split(v, []byte("\r\n"))
-
 	for i, line := range lines {
 		//fmt.Println(i, string(line))
 		line = bytes.TrimSpace(line)
@@ -110,48 +108,50 @@ func Parse(v []byte) (output SipMsg) {
 			// For the first line parse the request
 			ParseSipReq(line, &output.Req)
 		} else {
-			// For subsequent lines split in sep (: for sip, = for sdp)
-			spos, stype := indexSep(line)
-			if spos > 0 && stype == ':' {
-				// SIP: Break up into header and value
-				lhdr := strings.ToLower(string(line[0:spos]))
-				lval := bytes.TrimSpace(line[spos+1:])
-
-				// Switch on the line header
-				//fmt.Println(i, string(lhdr), string(lval))
-				switch {
-				case lhdr == "f" || lhdr == "from":
-					ParseSipFrom(lval, &output.From)
-				case lhdr == "t" || lhdr == "to":
-					ParseSipTo(lval, &output.To)
-				case lhdr == "m" || lhdr == "contact":
-					ParseSipContact(lval, &output.Contact)
-				case lhdr == "v" || lhdr == "via":
-					var tmpVia SipVia
-					output.Via = append(output.Via, tmpVia)
-					ParseSipVia(lval, &output.Via[viaIdx])
-					viaIdx++
-				case lhdr == "i" || lhdr == "call-id":
-					output.CallId.Value = lval
-				case lhdr == "c" || lhdr == "content-type":
-					output.ContType.Value = lval
-				case lhdr == "content-length":
-					output.ContLen.Value = lval
-				case lhdr == "user-agent":
-					output.Ua.Value = lval
-				case lhdr == "expires":
-					output.Exp.Value = lval
-				case lhdr == "max-forwards":
-					output.MaxFwd.Value = lval
-				case lhdr == "cseq":
-					ParseSipCseq(lval, &output.Cseq)
-				} // End of Switch
-			}
-
+			parseLine(line, &output, &viaIdx)
 		}
 	}
-
 	return
+}
+
+func parseLine(line []byte, output *SipMsg, viaIdx *int) {
+	// For subsequent lines split in sep (: for sip, = for sdp)
+	spos, stype := indexSep(line)
+	if spos > 0 && stype == ':' {
+		// SIP: Break up into header and value
+		lhdr := strings.ToLower(string(line[0:spos]))
+		lval := bytes.TrimSpace(line[spos+1:])
+
+		// Switch on the line header
+		//fmt.Println(i, string(lhdr), string(lval))
+		switch {
+		case lhdr == "f" || lhdr == "from":
+			ParseSipFrom(lval, &output.From)
+		case lhdr == "t" || lhdr == "to":
+			ParseSipTo(lval, &output.To)
+		case lhdr == "m" || lhdr == "contact":
+			ParseSipContact(lval, &output.Contact)
+		case lhdr == "v" || lhdr == "via":
+			var tmpVia SipVia
+			output.Via = append(output.Via, tmpVia)
+			ParseSipVia(lval, &output.Via[*viaIdx])
+			*viaIdx++
+		case lhdr == "i" || lhdr == "call-id":
+			output.CallId.Value = lval
+		case lhdr == "c" || lhdr == "content-type":
+			output.ContType.Value = lval
+		case lhdr == "content-length":
+			output.ContLen.Value = lval
+		case lhdr == "user-agent":
+			output.Ua.Value = lval
+		case lhdr == "expires":
+			output.Exp.Value = lval
+		case lhdr == "max-forwards":
+			output.MaxFwd.Value = lval
+		case lhdr == "cseq":
+			ParseSipCseq(lval, &output.Cseq)
+		} // End of Switch
+	}
 }
 
 // Finds the first valid Separate or notes its type
